@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { playEatSound, startBgm, stopBgm } from "@/lib/sounds";
 
 interface FallingItem {
   id: number;
@@ -70,13 +71,17 @@ const Game = () => {
     setMissed(0);
     setCatcherX(50);
     setStarted(true);
+    startBgm();
   };
 
   // Keyboard input
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       keysPressed.current.add(e.key);
-      if (!started && !gameOver) setStarted(true);
+      if (!started && !gameOver) {
+        setStarted(true);
+        startBgm();
+      }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
       keysPressed.current.delete(e.key);
@@ -103,7 +108,10 @@ const Game = () => {
     };
 
     const handleTouchStart = (e: TouchEvent) => {
-      if (!started && !gameOver) setStarted(true);
+      if (!started && !gameOver) {
+        setStarted(true);
+        startBgm();
+      }
       handleTouchMove(e);
     };
 
@@ -124,8 +132,8 @@ const Game = () => {
       // Move catcher
       setCatcherX((prev) => {
         let next = prev;
-        if (keysPressed.current.has("ArrowLeft") || keysPressed.current.has("a")) next -= 2;
-        if (keysPressed.current.has("ArrowRight") || keysPressed.current.has("d")) next += 2;
+        if (keysPressed.current.has("ArrowLeft") || keysPressed.current.has("a")) next -= 1;
+        if (keysPressed.current.has("ArrowRight") || keysPressed.current.has("d")) next += 1;
         return Math.max(5, Math.min(95, next));
       });
 
@@ -169,6 +177,7 @@ const Game = () => {
           const catcherRight = catcherX + 5;
           if (item.y >= 85 && item.y <= 95 && item.x >= catcherLeft - 3 && item.x <= catcherRight + 3) {
             pointsGained += item.points;
+            playEatSound(item.points > 0);
             setFlash(item.points > 0 ? "green" : "red");
             setTimeout(() => setFlash(null), 200);
           } else {
@@ -189,6 +198,7 @@ const Game = () => {
   useEffect(() => {
     if (missed >= 10 && started) {
       setGameOver(true);
+      stopBgm();
       if (score > highScore) {
         setHighScore(score);
         localStorage.setItem("catchGameHighScore", score.toString());
