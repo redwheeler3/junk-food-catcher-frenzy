@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { playEatSound, startBgm, stopBgm } from "@/lib/sounds";
+import { playEatSound, playFartSound, startBgm, stopBgm } from "@/lib/sounds";
 
 interface FallingItem {
   id: number;
@@ -35,6 +35,11 @@ const Game = () => {
   const keysPressed = useRef<Set<string>>(new Set());
   const touchStartX = useRef<number | null>(null);
 
+  // Difficulty scales with score
+  const difficulty = Math.floor(score / 15);
+  const spawnRate = Math.max(25, 60 - difficulty * 5);
+  const baseSpeed = 0.3 + difficulty * 0.08;
+
   const spawnItem = useCallback(() => {
     const rand = Math.random();
     let emoji: string, type: FallingItem["type"], points: number;
@@ -58,11 +63,11 @@ const Game = () => {
       emoji,
       x: Math.random() * 85 + 5,
       y: -5,
-      speed: 0.3 + Math.random() * 0.4,
+      speed: baseSpeed + Math.random() * 0.4,
       type,
       points,
     };
-  }, []);
+  }, [baseSpeed]);
 
   const resetGame = () => {
     setScore(0);
@@ -138,7 +143,7 @@ const Game = () => {
       });
 
       spawnTimer++;
-      if (spawnTimer > 60) {
+      if (spawnTimer > spawnRate) {
         spawnTimer = 0;
         setItems((prev) => [...prev, spawnItem()]);
       }
@@ -156,13 +161,14 @@ const Game = () => {
         });
         if (newMissed > 0) {
           setMissed((m) => m + newMissed);
+          playFartSound();
         }
         return next;
       });
     }, GAME_SPEED);
 
     return () => clearInterval(interval);
-  }, [started, gameOver, spawnItem]);
+  }, [started, gameOver, spawnItem, spawnRate]);
 
   // Collision detection
   useEffect(() => {
