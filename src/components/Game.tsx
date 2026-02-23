@@ -7,7 +7,7 @@ interface FallingItem {
   x: number;
   y: number;
   speed: number;
-  type: "burger" | "junk" | "veggie";
+  type: "burger" | "junk" | "veggie" | "powerup";
   points: number;
 }
 
@@ -15,8 +15,8 @@ const BURGERS = ["🍔"];
 const JUNK_FOOD = ["🍕", "🌭", "🍟", "🍩", "🍪", "🧁", "🍫", "🍭"];
 const VEGGIES = ["🥦", "🥕", "🥬", "🍅", "🥒", "🌽"];
 
-const CATCHER_WIDTH = 60;
 const GAME_SPEED = 16;
+const MAX_SPEED_CAP = 1.2;
 
 const Game = () => {
   const [score, setScore] = useState(0);
@@ -30,19 +30,38 @@ const Game = () => {
   });
   const [missed, setMissed] = useState(0);
   const [flash, setFlash] = useState<string | null>(null);
+  const [powered, setPowered] = useState(false);
+  const [powerTimer, setPowerTimer] = useState(0);
   const idCounter = useRef(0);
   const gameArea = useRef<HTMLDivElement>(null);
   const keysPressed = useRef<Set<string>>(new Set());
-  const touchStartX = useRef<number | null>(null);
+  const poweredRef = useRef(false);
+
+  // Keep ref in sync
+  useEffect(() => { poweredRef.current = powered; }, [powered]);
 
   // Difficulty scales with score
   const difficulty = Math.floor(score / 15);
   const spawnRate = Math.max(25, 60 - difficulty * 5);
-  const baseSpeed = 0.3 + difficulty * 0.08;
+  const baseSpeed = Math.min(MAX_SPEED_CAP, 0.3 + difficulty * 0.08);
+  const moveSpeed = powered ? 2.5 : 1;
 
   const spawnItem = useCallback(() => {
     const rand = Math.random();
     let emoji: string, type: FallingItem["type"], points: number;
+
+    // 3% chance for power-up
+    if (rand < 0.03) {
+      return {
+        id: idCounter.current++,
+        emoji: "⚡",
+        x: Math.random() * 85 + 5,
+        y: -5,
+        speed: Math.min(MAX_SPEED_CAP, baseSpeed + Math.random() * 0.3),
+        type: "powerup" as const,
+        points: 0,
+      };
+    }
 
     if (rand < 0.2) {
       emoji = BURGERS[0];
@@ -63,11 +82,31 @@ const Game = () => {
       emoji,
       x: Math.random() * 85 + 5,
       y: -5,
-      speed: baseSpeed + Math.random() * 0.4,
+      speed: Math.min(MAX_SPEED_CAP, baseSpeed + Math.random() * 0.4),
       type,
       points,
     };
   }, [baseSpeed]);
+
+  const activatePowerUp = useCallback(() => {
+    setPowered(true);
+    setPowerTimer(10);
+  }, []);
+
+  // Power-up countdown
+  useEffect(() => {
+    if (!powered) return;
+    const iv = setInterval(() => {
+      setPowerTimer((t) => {
+        if (t <= 1) {
+          setPowered(false);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [powered]);
 
   const resetGame = () => {
     setScore(0);
@@ -75,6 +114,8 @@ const Game = () => {
     setGameOver(false);
     setMissed(0);
     setCatcherX(50);
+    setPowered(false);
+    setPowerTimer(0);
     setStarted(true);
     startBgm();
   };
@@ -137,8 +178,8 @@ const Game = () => {
       // Move catcher
       setCatcherX((prev) => {
         let next = prev;
-        if (keysPressed.current.has("ArrowLeft") || keysPressed.current.has("a")) next -= 1;
-        if (keysPressed.current.has("ArrowRight") || keysPressed.current.has("d")) next += 1;
+        if (keysPressed.current.has("ArrowLeft") || keysPressed.current.has("a")) next -= moveSpeed;
+        if (keysPressed.current.has("ArrowRight") || keysPressed.current.has("d")) next += moveSpeed;
         return Math.max(5, Math.min(95, next));
       });
 
@@ -154,7 +195,11 @@ const Game = () => {
         prev.forEach((item) => {
           const updated = { ...item, y: item.y + item.speed };
           if (updated.y > 100) {
-            if (item.type !== "veggie") newMissed++;
+            if (item.type !== "veggie" && item.type !== "powerup") {
+              if (!poweredRef.current) {
+                newMissed++;
+              }
+            }
           } else {
             next.push(updated);
           }
@@ -168,7 +213,7 @@ const Game = () => {
     }, GAME_SPEED);
 
     return () => clearInterval(interval);
-  }, [started, gameOver, spawnItem, spawnRate]);
+  }, [started, gameOver, spawnItem, spawnRate, moveSpeed]);
 
   // Collision detection
   useEffect(() => {
@@ -178,13 +223,18 @@ const Game = () => {
       setItems((prev) => {
         const remaining: FallingItem[] = [];
         let pointsGained = 0;
+        let gotPowerUp = false;
         prev.forEach((item) => {
           const catcherLeft = catcherX - 5;
           const catcherRight = catcherX + 5;
           if (item.y >= 85 && item.y <= 95 && item.x >= catcherLeft - 3 && item.x <= catcherRight + 3) {
-            pointsGained += item.points;
-            playEatSound(item.points > 0);
-            setFlash(item.points > 0 ? "green" : "red");
+            if (item.type === "powerup") {
+              gotPowerUp = true;
+            } else {
+              pointsGained += item.points;
+              playEatSound(item.points > 0);
+            }
+            setFlash(item.type === "powerup" ? "gold" : item.points > 0 ? "green" : "red");
             setTimeout(() => setFlash(null), 200);
           } else {
             remaining.push(item);
@@ -193,12 +243,15 @@ const Game = () => {
         if (pointsGained !== 0) {
           setScore((s) => s + pointsGained);
         }
+        if (gotPowerUp) {
+          activatePowerUp();
+        }
         return remaining;
       });
     }, GAME_SPEED);
 
     return () => clearInterval(checkInterval);
-  }, [started, gameOver, catcherX]);
+  }, [started, gameOver, catcherX, activatePowerUp]);
 
   // Game over when too many missed
   useEffect(() => {
@@ -218,6 +271,9 @@ const Game = () => {
       <div className="w-full max-w-lg flex justify-between items-center px-4 py-2 text-foreground font-bold text-lg">
         <span>⭐ {score}</span>
         <span className="text-muted-foreground text-sm">🏆 {highScore}</span>
+        {powered && (
+          <span className="text-yellow-400 text-sm animate-pulse">⚡ {powerTimer}s</span>
+        )}
         <span className="text-secondary text-sm">💔 {missed}/10</span>
       </div>
 
@@ -231,7 +287,9 @@ const Game = () => {
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: "linear-gradient(180deg, hsl(220 30% 15%) 0%, hsl(250 20% 25%) 60%, hsl(220 20% 12%) 100%)",
+            background: powered
+              ? "linear-gradient(180deg, hsl(45 80% 20%) 0%, hsl(30 60% 15%) 60%, hsl(220 20% 12%) 100%)"
+              : "linear-gradient(180deg, hsl(220 30% 15%) 0%, hsl(250 20% 25%) 60%, hsl(220 20% 12%) 100%)",
           }}
         />
 
@@ -264,7 +322,12 @@ const Game = () => {
               left: `${item.x}%`,
               top: `${item.y}%`,
               transform: "translate(-50%, -50%)",
-              filter: item.type === "burger" ? "drop-shadow(0 0 8px hsl(45 100% 55% / 0.6))" : undefined,
+              filter:
+                item.type === "powerup"
+                  ? "drop-shadow(0 0 10px hsl(45 100% 60% / 0.9))"
+                  : item.type === "burger"
+                  ? "drop-shadow(0 0 8px hsl(45 100% 55% / 0.6))"
+                  : undefined,
             }}
           >
             {item.emoji}
@@ -278,14 +341,18 @@ const Game = () => {
             left: `${catcherX}%`,
             bottom: "6%",
             transform: "translateX(-50%)",
-            filter: flash === "green"
+            filter: powered
+              ? "drop-shadow(0 0 16px hsl(45 100% 55% / 0.9))"
+              : flash === "green"
               ? "drop-shadow(0 0 12px hsl(160 60% 45% / 0.8))"
               : flash === "red"
               ? "drop-shadow(0 0 12px hsl(0 84% 60% / 0.8))"
+              : flash === "gold"
+              ? "drop-shadow(0 0 16px hsl(45 100% 55% / 0.9))"
               : "drop-shadow(0 2px 4px rgba(0,0,0,0.5))",
           }}
         >
-          🧒
+          {powered ? "🦸" : "🧒"}
         </div>
 
         {/* Start screen */}
@@ -296,8 +363,11 @@ const Game = () => {
             <p className="text-muted-foreground text-center px-8 mb-1">
               Catch burgers for <span className="text-primary font-bold">5pts</span>, junk food for <span className="text-primary font-bold">1pt</span>
             </p>
-            <p className="text-secondary text-center px-8 mb-6">
+            <p className="text-secondary text-center px-8 mb-1">
               Avoid veggies! <span className="font-bold">-3pts</span> 🥦
+            </p>
+            <p className="text-yellow-400 text-center px-8 mb-6">
+              Catch ⚡ for super speed & invincibility!
             </p>
             <p className="text-muted-foreground animate-pulse">
               ← → or touch to play
@@ -329,6 +399,7 @@ const Game = () => {
         <span>🍔 +5</span>
         <span>🍕 +1</span>
         <span>🥦 -3</span>
+        <span>⚡ Power!</span>
       </div>
     </div>
   );

@@ -36,35 +36,68 @@ export const playEatSound = (good: boolean) => {
 
 export const playFartSound = () => {
   const ctx = audioCtx();
-  
-  // Low rumbling oscillator
+  const t = ctx.currentTime;
+
+  // Create noise buffer for realistic texture
+  const bufferSize = ctx.sampleRate * 0.6;
+  const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const noiseData = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    noiseData[i] = Math.random() * 2 - 1;
+  }
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuffer;
+
+  // Bandpass filter to shape the noise into a "flappy" rumble
+  const bpFilter = ctx.createBiquadFilter();
+  bpFilter.type = "bandpass";
+  bpFilter.frequency.setValueAtTime(120, t);
+  bpFilter.frequency.linearRampToValueAtTime(60, t + 0.2);
+  bpFilter.frequency.linearRampToValueAtTime(100, t + 0.35);
+  bpFilter.frequency.linearRampToValueAtTime(40, t + 0.55);
+  bpFilter.Q.setValueAtTime(3, t);
+
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.3, t);
+  noiseGain.gain.linearRampToValueAtTime(0.45, t + 0.08);
+  noiseGain.gain.linearRampToValueAtTime(0.2, t + 0.3);
+  noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.55);
+
+  noise.connect(bpFilter);
+  bpFilter.connect(noiseGain);
+  noiseGain.connect(ctx.destination);
+  noise.start(t);
+  noise.stop(t + 0.55);
+
+  // Sub-bass rumble oscillator with wobble
   const osc1 = ctx.createOscillator();
   const gain1 = ctx.createGain();
   osc1.type = "sawtooth";
-  osc1.frequency.setValueAtTime(80, ctx.currentTime);
-  osc1.frequency.linearRampToValueAtTime(60, ctx.currentTime + 0.15);
-  osc1.frequency.linearRampToValueAtTime(90, ctx.currentTime + 0.25);
-  osc1.frequency.linearRampToValueAtTime(50, ctx.currentTime + 0.4);
-  gain1.gain.setValueAtTime(0.2, ctx.currentTime);
-  gain1.gain.linearRampToValueAtTime(0.25, ctx.currentTime + 0.1);
-  gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.45);
+  osc1.frequency.setValueAtTime(75, t);
+  osc1.frequency.linearRampToValueAtTime(55, t + 0.1);
+  osc1.frequency.linearRampToValueAtTime(85, t + 0.2);
+  osc1.frequency.linearRampToValueAtTime(45, t + 0.35);
+  osc1.frequency.linearRampToValueAtTime(70, t + 0.42);
+  osc1.frequency.linearRampToValueAtTime(35, t + 0.55);
+  gain1.gain.setValueAtTime(0.18, t);
+  gain1.gain.linearRampToValueAtTime(0.22, t + 0.08);
+  gain1.gain.exponentialRampToValueAtTime(0.01, t + 0.55);
   osc1.connect(gain1);
   gain1.connect(ctx.destination);
-  osc1.start(ctx.currentTime);
-  osc1.stop(ctx.currentTime + 0.45);
+  osc1.start(t);
+  osc1.stop(t + 0.55);
 
-  // Noise-like flutter using a second detuned oscillator
-  const osc2 = ctx.createOscillator();
-  const gain2 = ctx.createGain();
-  osc2.type = "square";
-  osc2.frequency.setValueAtTime(120, ctx.currentTime);
-  osc2.frequency.linearRampToValueAtTime(40, ctx.currentTime + 0.3);
-  gain2.gain.setValueAtTime(0.08, ctx.currentTime);
-  gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-  osc2.connect(gain2);
-  gain2.connect(ctx.destination);
-  osc2.start(ctx.currentTime);
-  osc2.stop(ctx.currentTime + 0.35);
+  // LFO to modulate gain for sputtering effect
+  const lfo = ctx.createOscillator();
+  const lfoGain = ctx.createGain();
+  lfo.type = "sine";
+  lfo.frequency.setValueAtTime(25, t);
+  lfo.frequency.linearRampToValueAtTime(15, t + 0.3);
+  lfoGain.gain.setValueAtTime(0.1, t);
+  lfo.connect(lfoGain);
+  lfoGain.connect(gain1.gain);
+  lfo.start(t);
+  lfo.stop(t + 0.55);
 };
 
 let bgmPlaying = false;
