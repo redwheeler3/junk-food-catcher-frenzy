@@ -35,27 +35,35 @@ const Game = () => {
   const idCounter = useRef(0);
   const gameArea = useRef<HTMLDivElement>(null);
   const keysPressed = useRef<Set<string>>(new Set());
+  const catcherXRef = useRef(50);
   const poweredRef = useRef(false);
 
   // Keep ref in sync
   useEffect(() => { poweredRef.current = powered; }, [powered]);
+  useEffect(() => { catcherXRef.current = catcherX; }, [catcherX]);
 
   // Difficulty scales with score
   const difficulty = Math.floor(score / 15);
   const spawnRate = Math.max(25, 60 - difficulty * 5);
   const baseSpeed = Math.min(MAX_SPEED_CAP, 0.3 + difficulty * 0.08);
-  const moveSpeed = powered ? 2.5 : 1;
+  const moveSpeed = powered ? 3 : 1.5;
 
-  const spawnItem = useCallback(() => {
+  const spawnItem = useCallback((currentCatcherX: number) => {
     const rand = Math.random();
     let emoji: string, type: FallingItem["type"], points: number;
 
-    // 3% chance for power-up
-    if (rand < 0.03) {
+    // Limit spawn distance from catcher (max 35% away)
+    const maxDist = 35;
+    const minX = Math.max(5, currentCatcherX - maxDist);
+    const maxX = Math.min(90, currentCatcherX + maxDist);
+    const spawnX = minX + Math.random() * (maxX - minX);
+
+    // 1% chance for power-up
+    if (rand < 0.01) {
       return {
         id: idCounter.current++,
         emoji: "⚡",
-        x: Math.random() * 85 + 5,
+        x: spawnX,
         y: -5,
         speed: Math.min(MAX_SPEED_CAP, baseSpeed + Math.random() * 0.3),
         type: "powerup" as const,
@@ -80,7 +88,7 @@ const Game = () => {
     return {
       id: idCounter.current++,
       emoji,
-      x: Math.random() * 85 + 5,
+      x: spawnX,
       y: -5,
       speed: Math.min(MAX_SPEED_CAP, baseSpeed + Math.random() * 0.4),
       type,
@@ -186,7 +194,7 @@ const Game = () => {
       spawnTimer++;
       if (spawnTimer > spawnRate) {
         spawnTimer = 0;
-        setItems((prev) => [...prev, spawnItem()]);
+        setItems((prev) => [...prev, spawnItem(catcherXRef.current)]);
       }
 
       setItems((prev) => {
