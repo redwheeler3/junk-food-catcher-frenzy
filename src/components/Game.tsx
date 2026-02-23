@@ -390,6 +390,7 @@ const Game = () => {
             )}
             <button
               onClick={resetGame}
+              onTouchEnd={(e) => { e.stopPropagation(); resetGame(); }}
               className="mt-4 px-8 py-3 bg-primary text-primary-foreground font-bold rounded-lg text-lg hover:opacity-90 transition-opacity"
             >
               Play Again
