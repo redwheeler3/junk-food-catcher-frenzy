@@ -34,6 +34,39 @@ export const playEatSound = (good: boolean) => {
   }
 };
 
+export const playFartSound = () => {
+  const ctx = audioCtx();
+  
+  // Low rumbling oscillator
+  const osc1 = ctx.createOscillator();
+  const gain1 = ctx.createGain();
+  osc1.type = "sawtooth";
+  osc1.frequency.setValueAtTime(80, ctx.currentTime);
+  osc1.frequency.linearRampToValueAtTime(60, ctx.currentTime + 0.15);
+  osc1.frequency.linearRampToValueAtTime(90, ctx.currentTime + 0.25);
+  osc1.frequency.linearRampToValueAtTime(50, ctx.currentTime + 0.4);
+  gain1.gain.setValueAtTime(0.2, ctx.currentTime);
+  gain1.gain.linearRampToValueAtTime(0.25, ctx.currentTime + 0.1);
+  gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.45);
+  osc1.connect(gain1);
+  gain1.connect(ctx.destination);
+  osc1.start(ctx.currentTime);
+  osc1.stop(ctx.currentTime + 0.45);
+
+  // Noise-like flutter using a second detuned oscillator
+  const osc2 = ctx.createOscillator();
+  const gain2 = ctx.createGain();
+  osc2.type = "square";
+  osc2.frequency.setValueAtTime(120, ctx.currentTime);
+  osc2.frequency.linearRampToValueAtTime(40, ctx.currentTime + 0.3);
+  gain2.gain.setValueAtTime(0.08, ctx.currentTime);
+  gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+  osc2.connect(gain2);
+  gain2.connect(ctx.destination);
+  osc2.start(ctx.currentTime);
+  osc2.stop(ctx.currentTime + 0.35);
+};
+
 let bgmPlaying = false;
 let bgmNodes: { oscs: OscillatorNode[]; gains: GainNode[] } | null = null;
 
