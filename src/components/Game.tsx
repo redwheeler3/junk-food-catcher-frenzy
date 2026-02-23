@@ -48,15 +48,11 @@ const Game = () => {
   const baseSpeed = Math.min(MAX_SPEED_CAP, 0.3 + difficulty * 0.08);
   const moveSpeed = powered ? 3 : 1.5;
 
-  const spawnItem = useCallback((currentCatcherX: number) => {
+  const spawnItem = useCallback(() => {
     const rand = Math.random();
     let emoji: string, type: FallingItem["type"], points: number;
 
-    // Limit spawn distance from catcher (max 35% away)
-    const maxDist = 35;
-    const minX = Math.max(5, currentCatcherX - maxDist);
-    const maxX = Math.min(90, currentCatcherX + maxDist);
-    const spawnX = minX + Math.random() * (maxX - minX);
+    const spawnX = 5 + Math.random() * 85;
 
     // 1% chance for power-up
     if (rand < 0.01) {
@@ -194,7 +190,7 @@ const Game = () => {
       spawnTimer++;
       if (spawnTimer > spawnRate) {
         spawnTimer = 0;
-        setItems((prev) => [...prev, spawnItem(catcherXRef.current)]);
+        setItems((prev) => [...prev, spawnItem()]);
       }
 
       setItems((prev) => {
