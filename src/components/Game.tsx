@@ -219,19 +219,25 @@ const Game = () => {
     return () => clearInterval(interval);
   }, [started, gameOver, spawnItem, spawnRate, moveSpeed]);
 
-  // Collision detection
+   // Collision detection — runs in game loop, uses ref for catcher position
   useEffect(() => {
     if (!started || gameOver) return;
 
     const checkInterval = setInterval(() => {
+      const cx = catcherXRef.current;
       setItems((prev) => {
         const remaining: FallingItem[] = [];
         let pointsGained = 0;
         let gotPowerUp = false;
         prev.forEach((item) => {
-          const catcherLeft = catcherX - 5;
-          const catcherRight = catcherX + 5;
-          if (item.y >= 85 && item.y <= 95 && item.x >= catcherLeft - 3 && item.x <= catcherRight + 3) {
+          const catcherLeft = cx - 7;
+          const catcherRight = cx + 7;
+          const itemHalf = 3;
+          if (
+            item.y >= 80 && item.y <= 98 &&
+            item.x + itemHalf >= catcherLeft &&
+            item.x - itemHalf <= catcherRight
+          ) {
             if (item.type === "powerup") {
               gotPowerUp = true;
             } else {
@@ -255,7 +261,7 @@ const Game = () => {
     }, GAME_SPEED);
 
     return () => clearInterval(checkInterval);
-  }, [started, gameOver, catcherX, activatePowerUp]);
+  }, [started, gameOver, activatePowerUp]);
 
   // Game over when too many missed
   useEffect(() => {
