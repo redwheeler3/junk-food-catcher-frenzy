@@ -230,11 +230,11 @@ const Game = () => {
         let pointsGained = 0;
         let gotPowerUp = false;
         prev.forEach((item) => {
-          const catcherLeft = cx - 7;
-          const catcherRight = cx + 7;
-          const itemHalf = 3;
+          const catcherLeft = cx - 6;
+          const catcherRight = cx + 6;
+          const itemHalf = 2;
           if (
-            item.y >= 80 && item.y <= 98 &&
+            item.y >= 82 && item.y <= 96 &&
             item.x + itemHalf >= catcherLeft &&
             item.x - itemHalf <= catcherRight
           ) {
